@@ -1,7 +1,7 @@
 {
-  "name": "tauri-app",
+  "name": "volunteering-log",
   "version": "0.1.0",
-  "description": "",
+  "description": "A simple cross-platform desktop app to log volunteering hours",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

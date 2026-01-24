@@ -1,156 +1,386 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
 
-  let name = $state("");
-  let greetMsg = $state("");
+  interface VolunteerEntry {
+    id: string;
+    place: string;
+    date: string;
+    hours: number;
+    notes: string;
+  }
 
-  async function greet(event: Event) {
-    event.preventDefault();
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsg = await invoke("greet", { name });
+  let entries: VolunteerEntry[] = [];
+  let place = '';
+  let date = new Date().toISOString().split('T')[0];
+  let hours: number | string = '';
+  let notes = '';
+  let editingId: string | null = null;
+
+  onMount(async () => {
+    entries = await invoke('get_entries');
+  });
+
+  async function handleSubmit() {
+    if (!place || !date || !hours) return;
+    
+    const hoursNum = typeof hours === 'string' ? parseFloat(hours) : hours;
+    
+    if (editingId) {
+      entries = await invoke('update_entry', {
+        id: editingId,
+        place,
+        date,
+        hours: hoursNum,
+        notes
+      });
+      editingId = null;
+    } else {
+      entries = await invoke('add_entry', {
+        place,
+        date,
+        hours: hoursNum,
+        notes
+      });
+    }
+    
+    resetForm();
+  }
+
+  function resetForm() {
+    place = '';
+    date = new Date().toISOString().split('T')[0];
+    hours = '';
+    notes = '';
+    editingId = null;
+  }
+
+  function editEntry(entry: VolunteerEntry) {
+    place = entry.place;
+    date = entry.date;
+    hours = entry.hours;
+    notes = entry.notes;
+    editingId = entry.id;
+  }
+
+  async function deleteEntry(id: string) {
+    entries = await invoke('delete_entry', { id });
+  }
+
+  function getTotalHours(): number {
+    return entries.reduce((sum, e) => sum + e.hours, 0);
+  }
+
+  function formatDate(dateStr: string): string {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   }
 </script>
 
-<main class="container">
-  <h1>Welcome to Tauri + Svelte</h1>
+<main>
+  <header>
+    <h1>📋 Volunteering Log</h1>
+    <div class="total-hours">
+      Total: <strong>{getTotalHours().toFixed(1)}</strong> hours
+    </div>
+  </header>
 
-  <div class="row">
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo vite" alt="Vite Logo" />
-    </a>
-    <a href="https://tauri.app" target="_blank">
-      <img src="/tauri.svg" class="logo tauri" alt="Tauri Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank">
-      <img src="/svelte.svg" class="logo svelte-kit" alt="SvelteKit Logo" />
-    </a>
-  </div>
-  <p>Click on the Tauri, Vite, and SvelteKit logos to learn more.</p>
-
-  <form class="row" onsubmit={greet}>
-    <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
-    <button type="submit">Greet</button>
+  <form on:submit|preventDefault={handleSubmit}>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="place">Place</label>
+        <input
+          type="text"
+          id="place"
+          bind:value={place}
+          placeholder="Organization name"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="date">Date</label>
+        <input
+          type="date"
+          id="date"
+          bind:value={date}
+          required
+        />
+      </div>
+      <div class="form-group small">
+        <label for="hours">Hours</label>
+        <input
+          type="number"
+          id="hours"
+          bind:value={hours}
+          placeholder="0"
+          step="0.5"
+          min="0"
+          required
+        />
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="notes">Notes</label>
+      <textarea
+        id="notes"
+        bind:value={notes}
+        placeholder="What did you do? (optional)"
+        rows="2"
+      ></textarea>
+    </div>
+    <div class="form-actions">
+      {#if editingId}
+        <button type="button" class="btn-secondary" on:click={resetForm}>Cancel</button>
+      {/if}
+      <button type="submit" class="btn-primary">
+        {editingId ? 'Update Entry' : 'Add Entry'}
+      </button>
+    </div>
   </form>
-  <p>{greetMsg}</p>
+
+  <section class="entries">
+    {#if entries.length === 0}
+      <p class="empty-state">No volunteer hours logged yet. Add your first entry above!</p>
+    {:else}
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Place</th>
+            <th>Hours</th>
+            <th>Notes</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each entries.sort((a, b) => b.date.localeCompare(a.date)) as entry}
+            <tr class:editing={editingId === entry.id}>
+              <td class="date">{formatDate(entry.date)}</td>
+              <td class="place">{entry.place}</td>
+              <td class="hours">{entry.hours}</td>
+              <td class="notes">{entry.notes || '-'}</td>
+              <td class="actions">
+                <button class="btn-icon" on:click={() => editEntry(entry)} title="Edit">✏️</button>
+                <button class="btn-icon" on:click={() => deleteEntry(entry.id)} title="Delete">🗑️</button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  </section>
 </main>
 
 <style>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.svelte-kit:hover {
-  filter: drop-shadow(0 0 2em #ff3e00);
-}
-
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: #f5f7fa;
+    color: #333;
   }
 
-  a:hover {
-    color: #24c8db;
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
   }
 
-  input,
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #e1e5eb;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.75rem;
+    color: #1a1a2e;
+  }
+
+  .total-hours {
+    background: #4a6cf7;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+
+  form {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 24px;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-group.small {
+    flex: 0 0 100px;
+  }
+
+  label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 6px;
+  }
+
+  input, textarea {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: #4a6cf7;
+    box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.15);
+  }
+
+  textarea {
+    resize: vertical;
+    font-family: inherit;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+
   button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
   }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
 
+  button:active {
+    transform: scale(0.98);
+  }
+
+  .btn-primary {
+    background: #4a6cf7;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #3a5ce5;
+    box-shadow: 0 4px 12px rgba(74, 108, 247, 0.3);
+  }
+
+  .btn-secondary {
+    background: #e1e5eb;
+    color: #555;
+  }
+
+  .btn-secondary:hover {
+    background: #d1d5db;
+  }
+
+  .btn-icon {
+    padding: 6px 10px;
+    background: transparent;
+    font-size: 1rem;
+  }
+
+  .btn-icon:hover {
+    background: #f0f0f0;
+  }
+
+  .entries {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #888;
+    font-size: 1rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th {
+    text-align: left;
+    padding: 14px 16px;
+    background: #f8f9fb;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #555;
+    border-bottom: 1px solid #e1e5eb;
+  }
+
+  td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr:hover {
+    background: #fafbfc;
+  }
+
+  tr.editing {
+    background: #f0f4ff;
+  }
+
+  .date {
+    white-space: nowrap;
+    color: #666;
+  }
+
+  .place {
+    font-weight: 500;
+  }
+
+  .hours {
+    font-weight: 600;
+    color: #4a6cf7;
+  }
+
+  .notes {
+    color: #666;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .actions {
+    white-space: nowrap;
+  }
 </style>
