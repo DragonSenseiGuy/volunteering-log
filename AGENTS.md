@@ -63,13 +63,6 @@ cd src-tauri && cargo check
 - Font size 16px on inputs to prevent iOS zoom
 - Include iOS safe area padding
 
-## iOS Development Notes
-
-- Requires Apple Developer account (free works with physical device)
-- Team ID configured in `tauri.conf.json` under `bundle.iOS.developmentTeam`
-- Must enable Developer Mode on iPhone (Settings → Privacy & Security)
-- Must trust developer certificate (Settings → General → VPN & Device Management)
-
 ## Data Storage
 
 Data stored as JSON at the app's data directory:
