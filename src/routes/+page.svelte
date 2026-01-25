@@ -158,28 +158,26 @@
             required
           />
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="date">Date</label>
-            <input
-              type="date"
-              id="date"
-              bind:value={date}
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label for="hours">Hours</label>
-            <input
-              type="number"
-              id="hours"
-              bind:value={hours}
-              placeholder="0"
-              step="0.5"
-              min="0"
-              required
-            />
-          </div>
+        <div class="form-group">
+          <label for="date">📅 Date (tap to change)</label>
+          <input
+            type="date"
+            id="date"
+            bind:value={date}
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label for="hours">⏱️ Hours</label>
+          <input
+            type="number"
+            id="hours"
+            bind:value={hours}
+            placeholder="0"
+            step="0.5"
+            min="0"
+            required
+          />
         </div>
         <div class="form-group">
           <label for="notes">Notes</label>
@@ -397,15 +395,6 @@
     gap: 16px;
   }
 
-  .form-row {
-    display: flex;
-    gap: 12px;
-  }
-
-  .form-row .form-group {
-    flex: 1;
-  }
-
   .form-group {
     display: flex;
     flex-direction: column;
@@ -426,6 +415,15 @@
     transition: border-color 0.2s, box-shadow 0.2s;
     box-sizing: border-box;
     width: 100%;
+    background: white;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input[type="date"] {
+    cursor: pointer;
+    background: #f8f9fb;
+    border: 2px solid #4a6cf7;
   }
 
   input:focus, textarea:focus {
