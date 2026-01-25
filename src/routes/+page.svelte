@@ -31,7 +31,7 @@
   let currentPage = 1;
   const perPage = 10;
 
-  let showProfileModal = false;
+  let showProfileModal = true;
   let newProfileName = '';
 
   onMount(async () => {
@@ -85,7 +85,14 @@
   }
 
   async function createProfile() {
-    if (!db || !newProfileName.trim()) return;
+    if (!newProfileName.trim()) {
+      alert('Please enter a name');
+      return;
+    }
+    if (!db) {
+      alert('Database not loaded yet');
+      return;
+    }
     
     try {
       await db.execute('INSERT INTO profiles (name) VALUES (?)', [newProfileName.trim()]);
@@ -95,7 +102,8 @@
       showProfileModal = false;
       await loadEntries();
     } catch (e) {
-      alert('Profile name already exists!');
+      console.error('Create profile error:', e);
+      alert('Error creating profile: ' + e);
     }
   }
 
@@ -226,13 +234,12 @@
           bind:value={newProfileName}
           placeholder="Enter name"
           required
-          autofocus
         />
         <div class="modal-actions">
           {#if profiles.length > 0}
             <button type="button" class="btn-secondary" on:click={() => showProfileModal = false}>Cancel</button>
           {/if}
-          <button type="submit" class="btn-primary">Create Profile</button>
+          <button type="submit" class="btn-primary" on:click={createProfile}>Create Profile</button>
         </div>
       </form>
     </div>
@@ -258,7 +265,7 @@
         </select>
       </div>
       <div class="profile-actions">
-        <button class="btn-small" on:click={() => showProfileModal = true}>+ Add</button>
+        <button class="btn-small primary" on:click={() => showProfileModal = true}>+ Add</button>
         {#if profiles.length > 1}
           <button class="btn-small delete" on:click={() => currentProfile && deleteProfile(currentProfile)}>🗑️</button>
         {/if}
@@ -501,6 +508,15 @@
 
   .btn-small:hover {
     background: #d1d5db;
+  }
+
+  .btn-small.primary {
+    background: #4a6cf7;
+    color: white;
+  }
+
+  .btn-small.primary:hover {
+    background: #3a5ce5;
   }
 
   .btn-small.delete {
