@@ -1,6 +1,6 @@
 name: tauri-app
 options:
-  bundleIdPrefix: com.ajayn.volunteering-log
+  bundleIdPrefix: com.ajayn.volunteerlog
   deploymentTarget:
     iOS: 14.0
 fileGroups: [../../src]
@@ -11,7 +11,8 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Volunteering Log
-      PRODUCT_BUNDLE_IDENTIFIER: com.ajayn.volunteering-log
+      PRODUCT_BUNDLE_IDENTIFIER: com.ajayn.volunteerlog
+      DEVELOPMENT_TEAM: 65KWV62QC2
 targetTemplates:
   app:
     type: application

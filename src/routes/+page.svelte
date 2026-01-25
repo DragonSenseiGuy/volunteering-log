@@ -148,17 +148,17 @@
   {#if activeTab === 'add'}
     <section class="tab-content">
       <form on:submit|preventDefault={handleSubmit}>
+        <div class="form-group">
+          <label for="place">Place</label>
+          <input
+            type="text"
+            id="place"
+            bind:value={place}
+            placeholder="Organization name"
+            required
+          />
+        </div>
         <div class="form-row">
-          <div class="form-group">
-            <label for="place">Place</label>
-            <input
-              type="text"
-              id="place"
-              bind:value={place}
-              placeholder="Organization name"
-              required
-            />
-          </div>
           <div class="form-group">
             <label for="date">Date</label>
             <input
@@ -168,7 +168,7 @@
               required
             />
           </div>
-          <div class="form-group small">
+          <div class="form-group">
             <label for="hours">Hours</label>
             <input
               type="number"
@@ -212,11 +212,11 @@
             {/each}
           </select>
         </div>
-        <div class="year-hours">
-          {#if selectedYear !== 'all'}
-            {selectedYear} Total: <strong>{getFilteredHours().toFixed(1)}</strong> hours
-          {/if}
-        </div>
+        {#if selectedYear !== 'all'}
+          <div class="year-hours">
+            {selectedYear}: <strong>{getFilteredHours().toFixed(1)}</strong> hrs
+          </div>
+        {/if}
       </div>
 
       {#if entries.length === 0}
@@ -224,31 +224,24 @@
       {:else if getFilteredEntries().length === 0}
         <p class="empty-state">No entries for {selectedYear}.</p>
       {:else}
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Place</th>
-              <th>Hours</th>
-              <th>Notes</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each getPaginatedEntries() as entry}
-              <tr>
-                <td class="date">{formatDate(entry.date)}</td>
-                <td class="place">{entry.place}</td>
-                <td class="hours">{entry.hours}</td>
-                <td class="notes">{entry.notes || '-'}</td>
-                <td class="actions">
-                  <button class="btn-icon" on:click={() => editEntry(entry)} title="Edit">✏️</button>
-                  <button class="btn-icon" on:click={() => deleteEntry(entry.id)} title="Delete">🗑️</button>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
+        <div class="entries-list">
+          {#each getPaginatedEntries() as entry}
+            <div class="entry-card">
+              <div class="entry-header">
+                <span class="entry-place">{entry.place}</span>
+                <span class="entry-hours">{entry.hours} hrs</span>
+              </div>
+              <div class="entry-date">{formatDate(entry.date)}</div>
+              {#if entry.notes}
+                <div class="entry-notes">{entry.notes}</div>
+              {/if}
+              <div class="entry-actions">
+                <button class="btn-icon" on:click={() => editEntry(entry)} title="Edit">✏️ Edit</button>
+                <button class="btn-icon delete" on:click={() => deleteEntry(entry.id)} title="Delete">🗑️ Delete</button>
+              </div>
+            </div>
+          {/each}
+        </div>
 
         {#if getTotalPages() > 1}
           <div class="pagination">
@@ -260,7 +253,7 @@
               ← Prev
             </button>
             <span class="page-info">
-              Page {currentPage} of {getTotalPages()}
+              {currentPage} / {getTotalPages()}
             </span>
             <button 
               class="btn-page" 
@@ -283,35 +276,44 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background: #f5f7fa;
     color: #333;
+    -webkit-font-smoothing: antialiased;
   }
 
   main {
-    max-width: 900px;
+    max-width: 600px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 16px;
+    padding-top: env(safe-area-inset-top, 16px);
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+    box-sizing: border-box;
   }
 
   header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
     border-bottom: 2px solid #e1e5eb;
+    gap: 12px;
   }
 
   h1 {
     margin: 0;
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     color: #1a1a2e;
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   .total-hours {
     background: #4a6cf7;
     color: white;
-    padding: 8px 16px;
+    padding: 8px 12px;
     border-radius: 8px;
-    font-size: 1rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .tabs {
@@ -321,11 +323,12 @@
   }
 
   .tab {
-    padding: 12px 24px;
+    flex: 1;
+    padding: 12px 16px;
     border: none;
     background: #e1e5eb;
     color: #555;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     border-radius: 8px 8px 0 0;
@@ -343,8 +346,8 @@
 
   .tab-content {
     background: white;
-    padding: 24px;
-    border-radius: 0 8px 12px 12px;
+    padding: 20px;
+    border-radius: 0 0 12px 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
 
@@ -352,20 +355,23 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
     border-bottom: 1px solid #e1e5eb;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .year-filter {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .year-filter label {
     font-weight: 600;
     color: #555;
+    font-size: 0.9rem;
   }
 
   .year-filter select {
@@ -380,30 +386,29 @@
   .year-hours {
     background: #e8f4e8;
     color: #2d5a2d;
-    padding: 8px 14px;
+    padding: 6px 12px;
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
 
   form {
     display: flex;
     flex-direction: column;
+    gap: 16px;
   }
 
   .form-row {
     display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 12px;
+  }
+
+  .form-row .form-group {
+    flex: 1;
   }
 
   .form-group {
-    flex: 1;
     display: flex;
     flex-direction: column;
-  }
-
-  .form-group.small {
-    flex: 0 0 100px;
   }
 
   label {
@@ -414,11 +419,13 @@
   }
 
   input, textarea {
-    padding: 10px 12px;
+    padding: 12px;
     border: 1px solid #ddd;
     border-radius: 8px;
-    font-size: 1rem;
+    font-size: 16px; /* Prevents zoom on iOS */
     transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+    width: 100%;
   }
 
   input:focus, textarea:focus {
@@ -436,11 +443,10 @@
     display: flex;
     gap: 12px;
     justify-content: flex-end;
-    margin-top: 16px;
   }
 
   button {
-    padding: 10px 20px;
+    padding: 12px 20px;
     border: none;
     border-radius: 8px;
     font-size: 1rem;
@@ -472,75 +478,83 @@
     background: #d1d5db;
   }
 
-  .btn-icon {
-    padding: 6px 10px;
-    background: transparent;
-    font-size: 1rem;
-  }
-
-  .btn-icon:hover {
-    background: #f0f0f0;
-  }
-
   .empty-state {
     text-align: center;
-    padding: 48px 24px;
+    padding: 40px 20px;
     color: #888;
     font-size: 1rem;
   }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
+  .entries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  th {
-    text-align: left;
-    padding: 12px 14px;
+  .entry-card {
     background: #f8f9fb;
-    font-size: 0.875rem;
+    border-radius: 10px;
+    padding: 14px;
+    border: 1px solid #e1e5eb;
+  }
+
+  .entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .entry-place {
     font-weight: 600;
-    color: #555;
-    border-bottom: 1px solid #e1e5eb;
+    font-size: 1rem;
+    color: #1a1a2e;
   }
 
-  td {
-    padding: 12px 14px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-
-  tr:hover {
-    background: #fafbfc;
-  }
-
-  .date {
-    white-space: nowrap;
-    color: #666;
-  }
-
-  .place {
-    font-weight: 500;
-  }
-
-  .hours {
-    font-weight: 600;
+  .entry-hours {
+    font-weight: 700;
     color: #4a6cf7;
+    font-size: 1rem;
   }
 
-  .notes {
+  .entry-date {
     color: #666;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
   }
 
-  .actions {
-    white-space: nowrap;
+  .entry-notes {
+    color: #555;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+
+  .entry-actions {
+    display: flex;
+    gap: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #e1e5eb;
+  }
+
+  .btn-icon {
+    padding: 8px 14px;
+    background: #e1e5eb;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    color: #555;
+  }
+
+  .btn-icon:hover {
+    background: #d1d5db;
+  }
+
+  .btn-icon.delete {
+    color: #c53030;
+  }
+
+  .btn-icon.delete:hover {
+    background: #fed7d7;
   }
 
   .pagination {
@@ -548,13 +562,13 @@
     justify-content: center;
     align-items: center;
     gap: 16px;
-    margin-top: 20px;
+    margin-top: 16px;
     padding-top: 16px;
     border-top: 1px solid #e1e5eb;
   }
 
   .btn-page {
-    padding: 8px 16px;
+    padding: 10px 16px;
     background: #e1e5eb;
     color: #555;
     font-size: 0.9rem;
@@ -572,5 +586,25 @@
   .page-info {
     color: #666;
     font-size: 0.9rem;
+  }
+
+  /* Desktop styles */
+  @media (min-width: 768px) {
+    main {
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+    }
+
+    .total-hours {
+      padding: 8px 16px;
+      font-size: 1rem;
+    }
+
+    .tab-content {
+      padding: 24px;
+    }
   }
 </style>
