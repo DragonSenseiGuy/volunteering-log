@@ -1,21 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invoke } from '@tauri-apps/api/core';
+  import Database from '@tauri-apps/plugin-sql';
 
   interface VolunteerEntry {
-    id: string;
+    id: number;
     place: string;
     date: string;
     hours: number;
     notes: string;
   }
 
+  let db: Database | null = null;
   let entries: VolunteerEntry[] = [];
   let place = '';
   let date = new Date().toISOString().split('T')[0];
   let hours: number | string = '';
   let notes = '';
-  let editingId: string | null = null;
+  let editingId: number | null = null;
   
   let activeTab: 'add' | 'log' = 'add';
   let selectedYear: number | 'all' = 'all';
@@ -23,8 +24,23 @@
   const perPage = 10;
 
   onMount(async () => {
-    entries = await invoke('get_entries');
+    db = await Database.load('sqlite:volunteer.db');
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        place TEXT NOT NULL,
+        date TEXT NOT NULL,
+        hours REAL NOT NULL,
+        notes TEXT DEFAULT ''
+      )
+    `);
+    await loadEntries();
   });
+
+  async function loadEntries() {
+    if (!db) return;
+    entries = await db.select<VolunteerEntry[]>('SELECT * FROM entries ORDER BY date DESC');
+  }
 
   function getYears(): number[] {
     const years = new Set(entries.map(e => new Date(e.date).getFullYear()));
@@ -58,28 +74,24 @@
   }
 
   async function handleSubmit() {
-    if (!place || !date || !hours) return;
+    if (!db || !place || !date || !hours) return;
     
     const hoursNum = typeof hours === 'string' ? parseFloat(hours) : hours;
     
-    if (editingId) {
-      entries = await invoke('update_entry', {
-        id: editingId,
-        place,
-        date,
-        hours: hoursNum,
-        notes
-      });
+    if (editingId !== null) {
+      await db.execute(
+        'UPDATE entries SET place = ?, date = ?, hours = ?, notes = ? WHERE id = ?',
+        [place, date, hoursNum, notes, editingId]
+      );
       editingId = null;
     } else {
-      entries = await invoke('add_entry', {
-        place,
-        date,
-        hours: hoursNum,
-        notes
-      });
+      await db.execute(
+        'INSERT INTO entries (place, date, hours, notes) VALUES (?, ?, ?, ?)',
+        [place, date, hoursNum, notes]
+      );
     }
     
+    await loadEntries();
     resetForm();
   }
 
@@ -100,8 +112,10 @@
     activeTab = 'add';
   }
 
-  async function deleteEntry(id: string) {
-    entries = await invoke('delete_entry', { id });
+  async function deleteEntry(id: number) {
+    if (!db) return;
+    await db.execute('DELETE FROM entries WHERE id = ?', [id]);
+    await loadEntries();
     if (getPaginatedEntries().length === 0 && currentPage > 1) {
       currentPage--;
     }
@@ -411,7 +425,7 @@
     padding: 12px;
     border: 1px solid #ddd;
     border-radius: 8px;
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 16px;
     transition: border-color 0.2s, box-shadow 0.2s;
     box-sizing: border-box;
     width: 100%;
@@ -586,7 +600,6 @@
     font-size: 0.9rem;
   }
 
-  /* Desktop styles */
   @media (min-width: 768px) {
     main {
       padding: 24px;

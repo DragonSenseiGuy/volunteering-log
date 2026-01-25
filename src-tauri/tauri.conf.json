@@ -38,9 +38,8 @@
     }
   },
   "plugins": {
-    "fs": {
-      "all": true,
-      "scope": ["$APPDATA", "$APPDATA/*"]
+    "sql": {
+      "preload": ["sqlite:volunteer.db"]
     }
   }
 }

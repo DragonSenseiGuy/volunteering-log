@@ -65,7 +65,7 @@ cd src-tauri && cargo check
 
 ## Data Storage
 
-Data stored as JSON at the app's data directory:
-- macOS: `~/Library/Application Support/com.ajayn.volunteerlog/volunteer_log.json`
-- Windows: `%APPDATA%/com.ajayn.volunteerlog/volunteer_log.json`
-- Linux: `~/.local/share/com.ajayn.volunteerlog/volunteer_log.json`
+Uses SQLite database via `@tauri-apps/plugin-sql`:
+- Database file: `volunteer.db` in app data directory
+- Table: `entries` with columns: `id`, `place`, `date`, `hours`, `notes`
+- All CRUD operations done from frontend using SQL queries
