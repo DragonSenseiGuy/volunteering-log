@@ -35,34 +35,39 @@
   let newProfileName = '';
 
   onMount(async () => {
-    db = await Database.load('sqlite:volunteer.db');
-    
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS profiles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE
-      )
-    `);
-    
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS entries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        profile_id INTEGER NOT NULL,
-        place TEXT NOT NULL,
-        date TEXT NOT NULL,
-        hours REAL NOT NULL,
-        notes TEXT DEFAULT '',
-        FOREIGN KEY (profile_id) REFERENCES profiles(id)
-      )
-    `);
-    
-    await loadProfiles();
-    
-    if (profiles.length === 0) {
-      showProfileModal = true;
-    } else {
-      currentProfile = profiles[0];
-      await loadEntries();
+    try {
+      db = await Database.load('sqlite:volunteer.db');
+      
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS profiles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE
+        )
+      `);
+      
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS entries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          profile_id INTEGER NOT NULL,
+          place TEXT NOT NULL,
+          date TEXT NOT NULL,
+          hours REAL NOT NULL,
+          notes TEXT DEFAULT '',
+          FOREIGN KEY (profile_id) REFERENCES profiles(id)
+        )
+      `);
+      
+      await loadProfiles();
+      
+      if (profiles.length === 0) {
+        showProfileModal = true;
+      } else {
+        currentProfile = profiles[0];
+        await loadEntries();
+      }
+    } catch (e) {
+      console.error('Database init error:', e);
+      alert('Database error: ' + e);
     }
   });
 
