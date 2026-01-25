@@ -2,8 +2,14 @@
   import { onMount } from 'svelte';
   import Database from '@tauri-apps/plugin-sql';
 
+  interface Profile {
+    id: number;
+    name: string;
+  }
+
   interface VolunteerEntry {
     id: number;
+    profile_id: number;
     place: string;
     date: string;
     hours: number;
@@ -11,6 +17,8 @@
   }
 
   let db: Database | null = null;
+  let profiles: Profile[] = [];
+  let currentProfile: Profile | null = null;
   let entries: VolunteerEntry[] = [];
   let place = '';
   let date = new Date().toISOString().split('T')[0];
@@ -23,23 +31,92 @@
   let currentPage = 1;
   const perPage = 10;
 
+  let showProfileModal = false;
+  let newProfileName = '';
+
   onMount(async () => {
     db = await Database.load('sqlite:volunteer.db');
+    
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE
+      )
+    `);
+    
     await db.execute(`
       CREATE TABLE IF NOT EXISTS entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
         place TEXT NOT NULL,
         date TEXT NOT NULL,
         hours REAL NOT NULL,
-        notes TEXT DEFAULT ''
+        notes TEXT DEFAULT '',
+        FOREIGN KEY (profile_id) REFERENCES profiles(id)
       )
     `);
-    await loadEntries();
+    
+    await loadProfiles();
+    
+    if (profiles.length === 0) {
+      showProfileModal = true;
+    } else {
+      currentProfile = profiles[0];
+      await loadEntries();
+    }
   });
 
-  async function loadEntries() {
+  async function loadProfiles() {
     if (!db) return;
-    entries = await db.select<VolunteerEntry[]>('SELECT * FROM entries ORDER BY date DESC');
+    profiles = await db.select<Profile[]>('SELECT * FROM profiles ORDER BY name');
+  }
+
+  async function loadEntries() {
+    if (!db || !currentProfile) return;
+    entries = await db.select<VolunteerEntry[]>(
+      'SELECT * FROM entries WHERE profile_id = ? ORDER BY date DESC',
+      [currentProfile.id]
+    );
+  }
+
+  async function createProfile() {
+    if (!db || !newProfileName.trim()) return;
+    
+    try {
+      await db.execute('INSERT INTO profiles (name) VALUES (?)', [newProfileName.trim()]);
+      await loadProfiles();
+      currentProfile = profiles.find(p => p.name === newProfileName.trim()) || profiles[0];
+      newProfileName = '';
+      showProfileModal = false;
+      await loadEntries();
+    } catch (e) {
+      alert('Profile name already exists!');
+    }
+  }
+
+  async function switchProfile(profile: Profile) {
+    currentProfile = profile;
+    currentPage = 1;
+    selectedYear = 'all';
+    await loadEntries();
+  }
+
+  async function deleteProfile(profile: Profile) {
+    if (!db) return;
+    if (!confirm(`Delete profile "${profile.name}" and all their entries?`)) return;
+    
+    await db.execute('DELETE FROM entries WHERE profile_id = ?', [profile.id]);
+    await db.execute('DELETE FROM profiles WHERE id = ?', [profile.id]);
+    await loadProfiles();
+    
+    if (profiles.length === 0) {
+      currentProfile = null;
+      entries = [];
+      showProfileModal = true;
+    } else if (currentProfile?.id === profile.id) {
+      currentProfile = profiles[0];
+      await loadEntries();
+    }
   }
 
   function getYears(): number[] {
@@ -74,7 +151,7 @@
   }
 
   async function handleSubmit() {
-    if (!db || !place || !date || !hours) return;
+    if (!db || !currentProfile || !place || !date || !hours) return;
     
     const hoursNum = typeof hours === 'string' ? parseFloat(hours) : hours;
     
@@ -86,8 +163,8 @@
       editingId = null;
     } else {
       await db.execute(
-        'INSERT INTO entries (place, date, hours, notes) VALUES (?, ?, ?, ?)',
-        [place, date, hoursNum, notes]
+        'INSERT INTO entries (profile_id, place, date, hours, notes) VALUES (?, ?, ?, ?, ?)',
+        [currentProfile.id, place, date, hoursNum, notes]
       );
     }
     
@@ -134,6 +211,29 @@
   }
 </script>
 
+{#if showProfileModal}
+  <div class="modal-overlay">
+    <div class="modal">
+      <h2>👤 {profiles.length === 0 ? 'Create Your Profile' : 'Add New Profile'}</h2>
+      <form on:submit|preventDefault={createProfile}>
+        <input
+          type="text"
+          bind:value={newProfileName}
+          placeholder="Enter name"
+          required
+          autofocus
+        />
+        <div class="modal-actions">
+          {#if profiles.length > 0}
+            <button type="button" class="btn-secondary" on:click={() => showProfileModal = false}>Cancel</button>
+          {/if}
+          <button type="submit" class="btn-primary">Create Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
+
 <main>
   <header>
     <h1>📋 Volunteering Log</h1>
@@ -141,6 +241,25 @@
       Total: <strong>{getTotalHours().toFixed(1)}</strong> hours
     </div>
   </header>
+
+  {#if currentProfile}
+    <div class="profile-bar">
+      <div class="profile-selector">
+        <span class="profile-label">👤</span>
+        <select bind:value={currentProfile} on:change={() => currentProfile && switchProfile(currentProfile)}>
+          {#each profiles as profile}
+            <option value={profile}>{profile.name}</option>
+          {/each}
+        </select>
+      </div>
+      <div class="profile-actions">
+        <button class="btn-small" on:click={() => showProfileModal = true}>+ Add</button>
+        {#if profiles.length > 1}
+          <button class="btn-small delete" on:click={() => currentProfile && deleteProfile(currentProfile)}>🗑️</button>
+        {/if}
+      </div>
+    </div>
+  {/if}
 
   <nav class="tabs">
     <button 
@@ -304,7 +423,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     padding-bottom: 12px;
     border-bottom: 2px solid #e1e5eb;
     gap: 12px;
@@ -326,6 +445,116 @@
     font-size: 0.9rem;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+
+  .profile-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  .profile-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .profile-label {
+    font-size: 1.2rem;
+  }
+
+  .profile-selector select {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    background: white;
+    cursor: pointer;
+  }
+
+  .profile-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-small {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #e1e5eb;
+    color: #555;
+  }
+
+  .btn-small:hover {
+    background: #d1d5db;
+  }
+
+  .btn-small.delete {
+    background: #fed7d7;
+    color: #c53030;
+  }
+
+  .btn-small.delete:hover {
+    background: #feb2b2;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+
+  .modal {
+    background: white;
+    padding: 24px;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 320px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  }
+
+  .modal h2 {
+    margin: 0 0 16px 0;
+    font-size: 1.3rem;
+    text-align: center;
+  }
+
+  .modal input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    box-sizing: border-box;
+    margin-bottom: 16px;
+  }
+
+  .modal input:focus {
+    outline: none;
+    border-color: #4a6cf7;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
   }
 
   .tabs {
